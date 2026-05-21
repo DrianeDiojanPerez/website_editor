@@ -30,7 +30,7 @@ pub fn configure() -> WorkerGuard {
         .with_span_list(false)
         .with_writer(file_writer);
 
-    let stdout_layer = fmt::layer().with_writer(std::io::stdout);
+    let stdout_layer = fmt::layer().with_writer(std::io::stdout).pretty();
 
     tracing_subscriber::registry()
         .with(env_filter)

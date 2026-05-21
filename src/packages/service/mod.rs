@@ -1,4 +1,7 @@
-pub mod item;
+pub mod project;
+pub mod project_member;
+pub mod project_version;
+pub mod user;
 
 use thiserror::Error;
 
@@ -30,18 +33,18 @@ pub fn internal_error() -> ServiceError {
     ServiceError::new("internal server error", codes::INTERNAL_ERROR)
 }
 
-pub fn err_item_not_found() -> ServiceError {
-    ServiceError::new("item not found", codes::ERR_RESOURCE_NOT_FOUND)
+pub fn err_not_found(resource: &str) -> ServiceError {
+    ServiceError::new(format!("{resource} not found"), codes::ERR_RESOURCE_NOT_FOUND)
 }
 
-pub fn err_item_validation(msg: impl Into<String>) -> ServiceError {
+pub fn err_validation(msg: impl Into<String>) -> ServiceError {
     ServiceError::new(msg, codes::ERR_VALIDATION)
 }
 
 impl From<RepoError> for ServiceError {
     fn from(err: RepoError) -> Self {
         match err {
-            RepoError::NotFound => err_item_not_found(),
+            RepoError::NotFound => err_not_found("resource"),
             RepoError::Sqlx(e) => {
                 tracing::error!(error = ?e, "repository sqlx error");
                 internal_error()
