@@ -23,3 +23,8 @@ bcrypt = "0.15"
 rand = "0.8"
 sha2 = "0.10"
 validator = { version = "0.18", features = ["derive"] }
+
+[dev-dependencies]
+mockall = "0.13"
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"

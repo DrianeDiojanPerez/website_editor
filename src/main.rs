@@ -1,10 +1,7 @@
-mod api;
-mod packages;
-mod utils;
-
-use crate::packages::lib::{env, jwt, logger};
-use crate::packages::repository::new_store;
-use crate::packages::store::sqlite::{new_sqlite_db, SqliteConfig};
+use website_editor::api;
+use website_editor::packages::lib::{env, jwt, logger};
+use website_editor::packages::repository::new_store;
+use website_editor::packages::store::sqlite::{new_sqlite_db, SqliteConfig};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -12,7 +9,6 @@ async fn main() -> anyhow::Result<()> {
         eprintln!("failed to load .env: {e}");
     }
 
-    // Keep the guard alive for the entire program — it flushes the file writer on drop.
     let _log_guard = logger::configure();
 
     let db_url = env::get_string("DATABASE_URL")?;

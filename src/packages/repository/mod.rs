@@ -27,6 +27,7 @@ pub enum RepoError {
 pub type RepoResult<T> = Result<T, RepoError>;
 
 // Equivalent of Go's `repository.Store` — exposes one accessor per repository.
+#[cfg_attr(test, mockall::automock)]
 pub trait Store: Send + Sync {
     fn user_store(&self) -> Arc<dyn UserRepository>;
     fn project_store(&self) -> Arc<dyn ProjectRepository>;
