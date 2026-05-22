@@ -15,6 +15,10 @@ pub struct Claims {
     pub username: String,
     pub iat: i64,
     pub exp: i64,
+    // `serde(default)` so older tokens issued before this claim existed still
+    // deserialize cleanly (treated as `false`).
+    #[serde(default)]
+    pub must_change_password: bool,
 }
 
 struct KeyPair {
@@ -81,13 +85,19 @@ impl TokenManager {
         self.refresh_days
     }
 
-    pub fn issue_access(&self, user_id: i64, username: &str) -> anyhow::Result<String> {
+    pub fn issue_access(
+        &self,
+        user_id: i64,
+        username: &str,
+        must_change_password: bool,
+    ) -> anyhow::Result<String> {
         let now = Utc::now();
         let claims = Claims {
             sub: user_id,
             username: username.to_string(),
             iat: now.timestamp(),
             exp: (now + Duration::minutes(self.access_minutes)).timestamp(),
+            must_change_password,
         };
         Ok(encode(
             &Header::new(Algorithm::EdDSA),
@@ -115,6 +125,7 @@ impl TokenManager {
             username: username.to_string(),
             iat: now.timestamp(),
             exp: (now + Duration::days(self.refresh_days)).timestamp(),
+            must_change_password: false,
         };
         Ok(encode(
             &Header::new(Algorithm::EdDSA),

@@ -6,14 +6,15 @@ use chrono::{Duration, Utc};
 use crate::packages::dto::auth::{
     AuthResponseDto, LoginDto, LogoutDto, RefreshDto, TokenPairDto,
 };
-use crate::packages::dto::user::NewUserDto;
+use crate::packages::dto::user::{ChangePasswordDto, NewUserDto, UserDto};
 use crate::packages::lib::jwt::{generate_refresh_token, sha256_hex, TokenManager};
 use crate::packages::lib::password;
 use crate::packages::model::user::User;
 use crate::packages::repository::Store;
 use crate::packages::service::user::UserService;
 use crate::packages::service::{
-    err_invalid_credentials, err_invalid_refresh_token, internal_error, ServiceResult,
+    err_invalid_credentials, err_invalid_refresh_token, err_validation, internal_error,
+    ServiceResult,
 };
 
 #[async_trait]
@@ -22,6 +23,14 @@ pub trait AuthService: Send + Sync {
     async fn login(&self, dto: LoginDto) -> ServiceResult<AuthResponseDto>;
     async fn refresh(&self, dto: RefreshDto) -> ServiceResult<AuthResponseDto>;
     async fn logout(&self, dto: LogoutDto) -> ServiceResult<()>;
+
+    // Authenticated user changes their own password. Clears the
+    // must_change_password flag and revokes their other refresh tokens.
+    async fn change_password(
+        &self,
+        user_id: i64,
+        dto: ChangePasswordDto,
+    ) -> ServiceResult<UserDto>;
 }
 
 pub struct AuthServiceImpl {
@@ -40,9 +49,11 @@ impl AuthServiceImpl {
     }
 
     async fn issue_pair_for_user(&self, user: User) -> ServiceResult<AuthResponseDto> {
+        let must_change = user.must_change_password != 0;
+
         let access_token = self
             .token_manager
-            .issue_access(user.id, &user.username)
+            .issue_access(user.id, &user.username, must_change)
             .map_err(|e| {
                 tracing::error!(error = ?e, "failed to issue access token");
                 internal_error()
@@ -83,9 +94,8 @@ pub fn new_auth_service(
 impl AuthService for AuthServiceImpl {
     #[tracing::instrument(skip(self, dto))]
     async fn signup(&self, dto: NewUserDto) -> ServiceResult<AuthResponseDto> {
-        // user_service.create validates and bcrypt-hashes the password.
-        let user_dto = self.user_service.create(dto).await?;
-        // Pull the freshly-created user (we need the user model, not the dto).
+        // self-signup: user just picked their own password, no force-reset.
+        let user_dto = self.user_service.create(dto, false).await?;
         let user = self.store.user_store().get(user_dto.id).await?;
         self.issue_pair_for_user(user).await
     }
@@ -94,7 +104,6 @@ impl AuthService for AuthServiceImpl {
     async fn login(&self, dto: LoginDto) -> ServiceResult<AuthResponseDto> {
         let user = match self.store.user_store().get_by_email(&dto.email).await {
             Ok(u) => u,
-            // Don't leak whether the email exists — same error either way.
             Err(_) => return Err(err_invalid_credentials()),
         };
 
@@ -115,7 +124,6 @@ impl AuthService for AuthServiceImpl {
             .await
             .map_err(|_| err_invalid_refresh_token())?;
 
-        // Rotate: revoke the presented token before issuing the new pair.
         let _ = self.store.refresh_token_store().revoke(row.id).await;
 
         let user = self.store.user_store().get(row.user_id).await?;
@@ -130,4 +138,45 @@ impl AuthService for AuthServiceImpl {
         }
         Ok(())
     }
+
+    #[tracing::instrument(skip(self, dto))]
+    async fn change_password(
+        &self,
+        user_id: i64,
+        dto: ChangePasswordDto,
+    ) -> ServiceResult<UserDto> {
+        let user = self.store.user_store().get(user_id).await?;
+
+        let current = dto.current_password;
+        let new = dto.new_password;
+
+        if !password::verify(current.clone(), user.password.clone()).await {
+            return Err(err_invalid_credentials());
+        }
+        // Cross-field rule — doesn't fit a single-field validator attribute.
+        if new == current {
+            return Err(err_validation("new password must differ from current"));
+        }
+
+        let hashed = password::hash(new).await.map_err(|e| {
+            tracing::error!(error = ?e, "password hash failed");
+            internal_error()
+        })?;
+
+        let updated = self
+            .store
+            .user_store()
+            .change_password(user_id, &hashed)
+            .await?;
+
+        // Invalidate all of this user's other sessions.
+        let _ = self
+            .store
+            .refresh_token_store()
+            .revoke_all_for_user(user_id)
+            .await;
+
+        Ok(updated.into())
+    }
 }
+

@@ -9,7 +9,7 @@ use super::handler::{
     project_member as project_member_handler, project_version as project_version_handler,
     user as user_handler, Handler,
 };
-use super::middlewares::jwt::require_jwt;
+use super::middlewares::jwt::{require_jwt, require_password_set};
 
 pub fn router(handler: Arc<Handler>) -> Router {
     // Public — no JWT required.
@@ -19,7 +19,17 @@ pub fn router(handler: Arc<Handler>) -> Router {
         .route("/auth/refresh", post(auth_handler::refresh))
         .route("/auth/logout", post(auth_handler::logout));
 
-    // Protected — every request must carry `Authorization: Bearer <token>`.
+    // Authenticated-but-not-fully-onboarded: only `change-password` is
+    // reachable while must_change_password is set, so it skips
+    // `require_password_set` but still requires a valid access token.
+    let change_password_only = Router::new()
+        .route("/auth/change-password", post(auth_handler::change_password))
+        .route_layer(axum::middleware::from_fn_with_state(
+            handler.clone(),
+            require_jwt,
+        ));
+
+    // Fully-authenticated routes — must have a valid token AND a settled password.
     let protected = Router::new()
         // Users
         .route(
@@ -31,6 +41,10 @@ pub fn router(handler: Arc<Handler>) -> Router {
             get(user_handler::get_user)
                 .patch(user_handler::update_user)
                 .delete(user_handler::delete_user),
+        )
+        .route(
+            "/users/:id/reset-password",
+            post(user_handler::force_password_reset),
         )
         // Projects
         .route(
@@ -64,12 +78,17 @@ pub fn router(handler: Arc<Handler>) -> Router {
             "/projects/:project_id/versions/:id",
             get(project_version_handler::get_project_version),
         )
+        // Stacked: JWT first, then password-set check (runs inside-out).
+        .route_layer(axum::middleware::from_fn(require_password_set))
         .route_layer(axum::middleware::from_fn_with_state(
             handler.clone(),
             require_jwt,
         ));
 
-    let v1 = Router::new().merge(public).merge(protected);
+    let v1 = Router::new()
+        .merge(public)
+        .merge(change_password_only)
+        .merge(protected);
 
     Router::new()
         .route("/health", get(health_handler::get_health))

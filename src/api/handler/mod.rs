@@ -62,9 +62,13 @@ impl IntoResponse for ServiceError {
             c if c == codes::ERR_UNAUTHORIZED
                 || c == codes::ERR_INVALID_CREDENTIALS
                 || c == codes::ERR_INVALID_REFRESH_TOKEN => StatusCode::UNAUTHORIZED,
+            c if c == codes::ERR_PASSWORD_CHANGE_REQUIRED => StatusCode::PRECONDITION_REQUIRED,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
-        let body: ApiResponse<()> = ApiResponse::err(self.code, self.message);
+        let body: ApiResponse<()> = match self.fields {
+            Some(f) => ApiResponse::err_with_fields(self.code, self.message, f),
+            None => ApiResponse::err(self.code, self.message),
+        };
         (status, Json(body)).into_response()
     }
 }
