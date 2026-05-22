@@ -1,16 +1,26 @@
 use std::sync::Arc;
 
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::Router;
 use tower_http::trace::TraceLayer;
 
 use super::handler::{
-    project as project_handler, project_member as project_member_handler,
-    project_version as project_version_handler, user as user_handler, Handler,
+    auth as auth_handler, health as health_handler, project as project_handler,
+    project_member as project_member_handler, project_version as project_version_handler,
+    user as user_handler, Handler,
 };
+use super::middlewares::jwt::require_jwt;
 
 pub fn router(handler: Arc<Handler>) -> Router {
-    let v1 = Router::new()
+    // Public — no JWT required.
+    let public = Router::new()
+        .route("/auth/signup", post(auth_handler::signup))
+        .route("/auth/login", post(auth_handler::login))
+        .route("/auth/refresh", post(auth_handler::refresh))
+        .route("/auth/logout", post(auth_handler::logout));
+
+    // Protected — every request must carry `Authorization: Bearer <token>`.
+    let protected = Router::new()
         // Users
         .route(
             "/users",
@@ -44,7 +54,7 @@ pub fn router(handler: Arc<Handler>) -> Router {
             axum::routing::patch(project_member_handler::update_project_member)
                 .delete(project_member_handler::detach_project_member),
         )
-        // Project versions (immutable snapshots)
+        // Project versions
         .route(
             "/projects/:project_id/versions",
             get(project_version_handler::list_project_versions)
@@ -53,10 +63,16 @@ pub fn router(handler: Arc<Handler>) -> Router {
         .route(
             "/projects/:project_id/versions/:id",
             get(project_version_handler::get_project_version),
-        );
+        )
+        .route_layer(axum::middleware::from_fn_with_state(
+            handler.clone(),
+            require_jwt,
+        ));
+
+    let v1 = Router::new().merge(public).merge(protected);
 
     Router::new()
-        .route("/health", get(|| async { "ok" }))
+        .route("/health", get(health_handler::get_health))
         .nest("/api/v1", v1)
         .with_state(handler)
         .layer(TraceLayer::new_for_http())

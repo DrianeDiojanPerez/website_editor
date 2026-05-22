@@ -6,4 +6,3 @@ fn_brace_style = "AlwaysNextLine"
 item_brace_style = "AlwaysNextLine"
 impl_brace_style = "AlwaysNextLine"
 match_block_brace_style = "AlwaysNextLine"
-

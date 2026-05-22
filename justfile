@@ -1,3 +1,17 @@
+gen-keys:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p keys
+    for kind in access refresh; do
+        if [ -f keys/$kind-private.pem ]; then
+            echo "keys/$kind-private.pem already exists, skipping"
+        else
+            openssl genpkey -algorithm Ed25519 -out keys/$kind-private.pem
+            openssl pkey -in keys/$kind-private.pem -pubout -out keys/$kind-public.pem
+            echo "generated keys/$kind-{private,public}.pem"
+        fi
+    done
+
 dry-release:
     goreleaser release --snapshot --clean --verbose
 release:

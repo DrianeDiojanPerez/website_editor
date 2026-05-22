@@ -1,3 +1,4 @@
+pub mod auth;
 pub mod project;
 pub mod project_member;
 pub mod project_version;
@@ -28,7 +29,6 @@ impl ServiceError {
 
 pub type ServiceResult<T> = Result<T, ServiceError>;
 
-// Canonical service-layer errors — mirrors `service.NewError(...)` in the Go service.
 pub fn internal_error() -> ServiceError {
     ServiceError::new("internal server error", codes::INTERNAL_ERROR)
 }
@@ -39,6 +39,21 @@ pub fn err_not_found(resource: &str) -> ServiceError {
 
 pub fn err_validation(msg: impl Into<String>) -> ServiceError {
     ServiceError::new(msg, codes::ERR_VALIDATION)
+}
+
+pub fn err_unauthorized(msg: impl Into<String>) -> ServiceError {
+    ServiceError::new(msg, codes::ERR_UNAUTHORIZED)
+}
+
+pub fn err_invalid_credentials() -> ServiceError {
+    ServiceError::new("invalid credentials", codes::ERR_INVALID_CREDENTIALS)
+}
+
+pub fn err_invalid_refresh_token() -> ServiceError {
+    ServiceError::new(
+        "invalid or expired refresh token",
+        codes::ERR_INVALID_REFRESH_TOKEN,
+    )
 }
 
 impl From<RepoError> for ServiceError {

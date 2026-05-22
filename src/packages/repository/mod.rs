@@ -1,6 +1,7 @@
 pub mod project;
 pub mod project_member;
 pub mod project_version;
+pub mod refresh_token;
 pub mod user;
 
 use std::sync::Arc;
@@ -11,6 +12,7 @@ use thiserror::Error;
 use self::project::{ProjectRepository, SqliteProjectRepository};
 use self::project_member::{ProjectMemberRepository, SqliteProjectMemberRepository};
 use self::project_version::{ProjectVersionRepository, SqliteProjectVersionRepository};
+use self::refresh_token::{RefreshTokenRepository, SqliteRefreshTokenRepository};
 use self::user::{SqliteUserRepository, UserRepository};
 
 #[derive(Debug, Error)]
@@ -30,6 +32,7 @@ pub trait Store: Send + Sync {
     fn project_store(&self) -> Arc<dyn ProjectRepository>;
     fn project_member_store(&self) -> Arc<dyn ProjectMemberRepository>;
     fn project_version_store(&self) -> Arc<dyn ProjectVersionRepository>;
+    fn refresh_token_store(&self) -> Arc<dyn RefreshTokenRepository>;
 }
 
 pub struct SqliteStore {
@@ -54,6 +57,9 @@ impl Store for SqliteStore {
     }
     fn project_version_store(&self) -> Arc<dyn ProjectVersionRepository> {
         Arc::new(SqliteProjectVersionRepository::new(self.pool.clone()))
+    }
+    fn refresh_token_store(&self) -> Arc<dyn RefreshTokenRepository> {
+        Arc::new(SqliteRefreshTokenRepository::new(self.pool.clone()))
     }
 }
 

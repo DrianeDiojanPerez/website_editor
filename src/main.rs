@@ -2,7 +2,7 @@ mod api;
 mod packages;
 mod utils;
 
-use crate::packages::lib::{env, logger};
+use crate::packages::lib::{env, jwt, logger};
 use crate::packages::repository::new_store;
 use crate::packages::store::sqlite::{new_sqlite_db, SqliteConfig};
 
@@ -26,8 +26,9 @@ async fn main() -> anyhow::Result<()> {
     })
     .await?;
     let store = new_store(pool);
+    let token_manager = jwt::new_token_manager()?;
 
-    let handler = api::handler::configure_handlers(store);
+    let handler = api::handler::configure_handlers(store, token_manager);
     let app = api::routes::router(handler);
 
     let listener = tokio::net::TcpListener::bind(&server_addr).await?;

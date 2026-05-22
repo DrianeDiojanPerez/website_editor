@@ -3,8 +3,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::packages::dto::user::{NewUserDto, UpdateUserDto, UserDto};
+use crate::packages::lib::password;
 use crate::packages::repository::Store;
-use crate::packages::service::{err_validation, ServiceResult};
+use crate::packages::service::{err_validation, internal_error, ServiceResult};
 
 #[async_trait]
 pub trait UserService: Send + Sync {
@@ -27,6 +28,13 @@ impl UserServiceImpl {
 
 pub fn new_user_service(store: Arc<dyn Store>) -> Arc<dyn UserService> {
     Arc::new(UserServiceImpl::new(store))
+}
+
+async fn hash_password(pwd: String) -> ServiceResult<String> {
+    password::hash(pwd).await.map_err(|e| {
+        tracing::error!(error = ?e, "password hash failed");
+        internal_error()
+    })
 }
 
 #[async_trait]
@@ -53,11 +61,12 @@ impl UserService for UserServiceImpl {
         if dto.password.len() < 8 {
             return Err(err_validation("password must be at least 8 characters"));
         }
-        // TODO: hash password before persisting (e.g. argon2/bcrypt).
+
+        let hashed = hash_password(dto.password).await?;
         let row = self
             .store
             .user_store()
-            .create(dto.username.trim(), dto.email.trim(), &dto.password)
+            .create(dto.username.trim(), dto.email.trim(), &hashed)
             .await?;
         Ok(row.into())
     }
@@ -69,7 +78,15 @@ impl UserService for UserServiceImpl {
 
         let username = dto.username.unwrap_or(existing.username);
         let email = dto.email.unwrap_or(existing.email);
-        let password = dto.password.unwrap_or(existing.password);
+        let password = match dto.password {
+            Some(new) if !new.is_empty() => {
+                if new.len() < 8 {
+                    return Err(err_validation("password must be at least 8 characters"));
+                }
+                hash_password(new).await?
+            }
+            _ => existing.password,
+        };
 
         let row = repo.update(id, &username, &email, &password).await?;
         Ok(row.into())

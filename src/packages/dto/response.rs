@@ -14,15 +14,6 @@ pub struct Response<T: Serialize> {
     pub error: Option<ErrorStructure>,
 }
 
-#[derive(Debug, Serialize)]
-pub struct SuccessStructure<T: Serialize> {
-    pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<T>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<i64>,
-}
-
 impl<T: Serialize> Response<T> {
     pub fn ok(data: T) -> Self {
         Self { data: Some(data), error: None }
