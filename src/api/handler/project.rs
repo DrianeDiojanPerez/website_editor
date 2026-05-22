@@ -4,6 +4,7 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 
+use crate::api::extractors::ValidatedJson;
 use crate::packages::dto::project::{NewProjectDto, ProjectDto, UpdateProjectDto};
 use crate::packages::dto::response::Response;
 use crate::packages::service::ServiceError;
@@ -28,7 +29,7 @@ pub async fn get_project(
 #[tracing::instrument(skip(h, dto))]
 pub async fn create_project(
     State(h): State<Arc<Handler>>,
-    Json(dto): Json<NewProjectDto>,
+    ValidatedJson(dto): ValidatedJson<NewProjectDto>,
 ) -> Result<(StatusCode, Json<Response<ProjectDto>>), ServiceError> {
     let p = h.project_service.create(dto).await?;
     Ok((StatusCode::CREATED, Json(Response::ok(p))))
@@ -38,7 +39,7 @@ pub async fn create_project(
 pub async fn update_project(
     State(h): State<Arc<Handler>>,
     Path(id): Path<i64>,
-    Json(dto): Json<UpdateProjectDto>,
+    ValidatedJson(dto): ValidatedJson<UpdateProjectDto>,
 ) -> Result<Json<Response<ProjectDto>>, ServiceError> {
     Ok(Json(Response::ok(
         h.project_service.update(id, dto).await?,

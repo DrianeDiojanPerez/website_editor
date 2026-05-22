@@ -4,6 +4,8 @@ pub mod project_member;
 pub mod project_version;
 pub mod user;
 
+use std::collections::HashMap;
+
 use thiserror::Error;
 
 use crate::packages::codes;
@@ -13,6 +15,8 @@ use crate::packages::repository::RepoError;
 pub struct ServiceError {
     pub message: String,
     pub code: i32,
+    // Populated only by validation errors. Maps `"field_name"` → `["msg", …]`.
+    pub fields: Option<HashMap<String, Vec<String>>>,
 }
 
 impl std::fmt::Display for ServiceError {
@@ -23,7 +27,7 @@ impl std::fmt::Display for ServiceError {
 
 impl ServiceError {
     pub fn new(message: impl Into<String>, code: i32) -> Self {
-        Self { message: message.into(), code }
+        Self { message: message.into(), code, fields: None }
     }
 }
 
@@ -54,6 +58,27 @@ pub fn err_invalid_refresh_token() -> ServiceError {
         "invalid or expired refresh token",
         codes::ERR_INVALID_REFRESH_TOKEN,
     )
+}
+
+// Used by the ValidatedJson extractor to translate `validator::ValidationErrors`
+// into a `ServiceError` that carries a `{field: [messages]}` map.
+pub fn err_from_validation(errors: validator::ValidationErrors) -> ServiceError {
+    let mut fields: HashMap<String, Vec<String>> = HashMap::new();
+    for (field, errs) in errors.field_errors() {
+        let msgs: Vec<String> = errs
+            .iter()
+            .map(|e| match &e.message {
+                Some(m) => m.to_string(),
+                None => e.code.to_string(),
+            })
+            .collect();
+        fields.insert(field.to_string(), msgs);
+    }
+    ServiceError {
+        message: "validation failed".to_string(),
+        code: codes::ERR_VALIDATION,
+        fields: Some(fields),
+    }
 }
 
 impl From<RepoError> for ServiceError {

@@ -4,6 +4,7 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 
+use crate::api::extractors::ValidatedJson;
 use crate::packages::dto::project_member::{
     AttachMemberDto, ProjectMemberDto, UpdateMemberDto,
 };
@@ -26,7 +27,7 @@ pub async fn list_project_members(
 pub async fn attach_project_member(
     State(h): State<Arc<Handler>>,
     Path(project_id): Path<i64>,
-    Json(dto): Json<AttachMemberDto>,
+    ValidatedJson(dto): ValidatedJson<AttachMemberDto>,
 ) -> Result<(StatusCode, Json<Response<ProjectMemberDto>>), ServiceError> {
     let m = h.project_member_service.attach(project_id, dto).await?;
     Ok((StatusCode::CREATED, Json(Response::ok(m))))
@@ -36,7 +37,7 @@ pub async fn attach_project_member(
 pub async fn update_project_member(
     State(h): State<Arc<Handler>>,
     Path((_project_id, id)): Path<(i64, i64)>,
-    Json(dto): Json<UpdateMemberDto>,
+    ValidatedJson(dto): ValidatedJson<UpdateMemberDto>,
 ) -> Result<Json<Response<ProjectMemberDto>>, ServiceError> {
     Ok(Json(Response::ok(
         h.project_member_service.update_role(id, dto).await?,

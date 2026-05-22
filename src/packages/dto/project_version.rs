@@ -1,6 +1,7 @@
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use validator::Validate;
 
 use crate::packages::model::project_version::ProjectVersion;
 
@@ -27,7 +28,7 @@ impl From<ProjectVersion> for ProjectVersionDto {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct NewProjectVersionDto {
     pub object_snapshot: Value,
     pub created_by: Option<i64>,

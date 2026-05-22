@@ -6,9 +6,7 @@ use crate::packages::dto::project_member::{
     AttachMemberDto, ProjectMemberDto, UpdateMemberDto,
 };
 use crate::packages::repository::Store;
-use crate::packages::service::{err_validation, ServiceResult};
-
-const ALLOWED_ROLES: &[&str] = &["editor", "viewer"];
+use crate::packages::service::ServiceResult;
 
 #[async_trait]
 pub trait ProjectMemberService: Send + Sync {
@@ -41,15 +39,6 @@ pub fn new_project_member_service(store: Arc<dyn Store>) -> Arc<dyn ProjectMembe
     Arc::new(ProjectMemberServiceImpl::new(store))
 }
 
-fn validate_role(role: &str) -> ServiceResult<()> {
-    if !ALLOWED_ROLES.contains(&role) {
-        return Err(err_validation(format!(
-            "role must be one of {ALLOWED_ROLES:?}"
-        )));
-    }
-    Ok(())
-}
-
 #[async_trait]
 impl ProjectMemberService for ProjectMemberServiceImpl {
     #[tracing::instrument(skip(self))]
@@ -73,7 +62,6 @@ impl ProjectMemberService for ProjectMemberServiceImpl {
         project_id: i64,
         dto: AttachMemberDto,
     ) -> ServiceResult<ProjectMemberDto> {
-        validate_role(&dto.role)?;
         let row = self
             .store
             .project_member_store()
@@ -88,7 +76,6 @@ impl ProjectMemberService for ProjectMemberServiceImpl {
         id: i64,
         dto: UpdateMemberDto,
     ) -> ServiceResult<ProjectMemberDto> {
-        validate_role(&dto.role)?;
         Ok(self
             .store
             .project_member_store()

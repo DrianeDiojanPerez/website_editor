@@ -1,6 +1,7 @@
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use validator::Validate;
 
 use crate::packages::model::project::Project;
 
@@ -27,15 +28,19 @@ impl From<Project> for ProjectDto {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct NewProjectDto {
+    #[validate(length(min = 1, max = 200, message = "must be 1-200 characters"))]
     pub name: String,
+
     #[serde(default)]
     pub object_data: Option<Value>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct UpdateProjectDto {
+    #[validate(length(min = 1, max = 200, message = "must be 1-200 characters"))]
     pub name: Option<String>,
+
     pub object_data: Option<Value>,
 }

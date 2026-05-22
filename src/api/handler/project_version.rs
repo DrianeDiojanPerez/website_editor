@@ -4,6 +4,7 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 
+use crate::api::extractors::ValidatedJson;
 use crate::packages::dto::project_version::{NewProjectVersionDto, ProjectVersionDto};
 use crate::packages::dto::response::Response;
 use crate::packages::service::ServiceError;
@@ -36,7 +37,7 @@ pub async fn get_project_version(
 pub async fn snapshot_project_version(
     State(h): State<Arc<Handler>>,
     Path(project_id): Path<i64>,
-    Json(dto): Json<NewProjectVersionDto>,
+    ValidatedJson(dto): ValidatedJson<NewProjectVersionDto>,
 ) -> Result<(StatusCode, Json<Response<ProjectVersionDto>>), ServiceError> {
     let v = h
         .project_version_service

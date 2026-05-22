@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use validator::Validate;
 
 use crate::packages::model::project_member::ProjectMember;
 
@@ -21,15 +22,30 @@ impl From<ProjectMember> for ProjectMemberDto {
     }
 }
 
-#[derive(Debug, Deserialize)]
+fn validate_role(role: &str) -> Result<(), validator::ValidationError> {
+    if role == "editor" || role == "viewer" {
+        Ok(())
+    } else {
+        // Custom validators report a `code` and an optional message.
+        let mut err = validator::ValidationError::new("invalid_role");
+        err.message = Some("must be `editor` or `viewer`".into());
+        Err(err)
+    }
+}
+
+#[derive(Debug, Deserialize, Validate)]
 pub struct AttachMemberDto {
+    #[validate(range(min = 1, message = "must be a positive id"))]
     pub user_id: i64,
+
     #[serde(default = "default_role")]
+    #[validate(custom(function = "validate_role"))]
     pub role: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct UpdateMemberDto {
+    #[validate(custom(function = "validate_role"))]
     pub role: String,
 }
 

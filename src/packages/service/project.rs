@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 
 use crate::packages::dto::project::{NewProjectDto, ProjectDto, UpdateProjectDto};
 use crate::packages::repository::Store;
-use crate::packages::service::{err_validation, ServiceResult};
+use crate::packages::service::ServiceResult;
 
 #[async_trait]
 pub trait ProjectService: Send + Sync {
@@ -45,9 +45,6 @@ impl ProjectService for ProjectServiceImpl {
 
     #[tracing::instrument(skip(self, dto))]
     async fn create(&self, dto: NewProjectDto) -> ServiceResult<ProjectDto> {
-        if dto.name.trim().is_empty() {
-            return Err(err_validation("name must not be empty"));
-        }
         let data: Value = dto.object_data.unwrap_or_else(|| json!({}));
         let row = self
             .store
@@ -59,13 +56,11 @@ impl ProjectService for ProjectServiceImpl {
 
     #[tracing::instrument(skip(self, dto))]
     async fn update(&self, id: i64, dto: UpdateProjectDto) -> ServiceResult<ProjectDto> {
+
         let repo = self.store.project_store();
         let existing = repo.get(id).await?;
 
         let name = dto.name.unwrap_or(existing.name);
-        if name.trim().is_empty() {
-            return Err(err_validation("name must not be empty"));
-        }
         let data = dto.object_data.unwrap_or(existing.object_data.0);
 
         let row = repo.update(id, &name, &data).await?;
