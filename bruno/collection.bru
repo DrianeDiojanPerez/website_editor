@@ -1,0 +1,20 @@
+auth {
+  mode: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  # website_editor API
+  #
+  # 1. Select the "Local" environment (top-right).
+  # 2. Run Auth > Signup (or Login) once — the post-response script stores
+  #    accessToken / refreshToken into the environment automatically.
+  # 3. All protected requests inherit the bearer token from this collection.
+  #
+  # Path params are environment vars: userId, projectId, memberId, versionId.
+  # Create/List the matching resource first — Create requests auto-store the
+  # new id into the environment.
+}

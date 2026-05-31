@@ -1,0 +1,11 @@
+meta {
+  name: Remove Member
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/projects/{{projectId}}/members/{{memberId}}
+  body: none
+  auth: inherit
+}

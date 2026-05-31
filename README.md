@@ -61,6 +61,17 @@ PATCH  /api/v1/items/:id
 DELETE /api/v1/items/:id
 ```
 
+## API docs
+
+Interactive API reference is served by the running app:
+
+- **`/`** — [Scalar](https://github.com/scalar/scalar) UI (try requests in the browser)
+- **`/openapi.yaml`** — the raw OpenAPI spec
+
+Both are embedded into the binary at compile time from `docs/`, so they ship with the executable.
+
+Prefer a desktop API client? Open the `bruno/` folder as a collection in [Bruno](https://www.usebruno.com/) (**Open Collection** → pick `bruno/`). Select the **Local** environment, then run `Auth > Register` (or `Login`) once — its script stores the access/refresh tokens automatically, and every protected request inherits the bearer token.
+
 ## Logs
 
 - **stdout** — human-readable
@@ -83,3 +94,14 @@ Then:
 - add a `pub foo_service` field to `Handler` and wire it in `configure_handlers` (`src/api/handler/mod.rs`)
 - register routes in `src/api/routes/mod.rs`
 - add a migration in `database/migrations/`
+
+## Other Rust testing tools worth knowing (didn't add, but here's the menu)
+
+| Crate | Use case |
+|---|---|
+| `pretty_assertions` | Pretty-printed diffs for `assert_eq!` on complex values |
+| `insta` | Snapshot testing (compare output to a checked-in golden file) |
+| `proptest` / `quickcheck` | Property-based testing — generate hundreds of inputs |
+| `serial_test` | Force certain tests to run sequentially (for env-mutating tests) |
+| `wiremock` | Mock outgoing HTTP for tests that call external APIs |
+| `cargo-nextest` | A faster test runner (parallel by default, better output) — install with `cargo install cargo-nextest`, run with `cargo nextest run` |

@@ -35,7 +35,7 @@ fn validate_role(role: &str) -> Result<(), validator::ValidationError> {
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct AttachMemberDto {
-    #[validate(range(min = 1, message = "must be a positive id"))]
+    #[validate(range(min = 1))]
     pub user_id: i64,
 
     #[serde(default = "default_role")]

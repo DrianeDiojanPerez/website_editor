@@ -34,41 +34,41 @@ impl From<User> for UserDto {
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct NewUserDto {
-    #[validate(length(min = 5, message = "must be at least 5 characters"))]
+    #[validate(length(min = 5))]
     pub username: String,
 
-    #[validate(email(message = "must be a valid email address"))]
+    #[validate(email)]
     pub email: String,
 
-    #[validate(length(min = 8, message = "must be at least 8 characters"))]
+    #[validate(length(min = 8))]
     pub password: String,
 }
 
 // Optional fields — `validator` only runs the check if the field is `Some`.
 #[derive(Debug, Deserialize, Validate)]
 pub struct UpdateUserDto {
-    #[validate(length(min = 5, message = "must be at least 5 characters"))]
+    #[validate(length(min = 5))]
     pub username: Option<String>,
 
-    #[validate(email(message = "must be a valid email address"))]
+    #[validate(email)]
     pub email: Option<String>,
 
-    #[validate(length(min = 8, message = "must be at least 8 characters"))]
+    #[validate(length(min = 8))]
     pub password: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct ChangePasswordDto {
-    #[validate(length(min = 1, message = "is required"))]
+    #[validate(length(min = 1))]
     pub current_password: String,
 
-    #[validate(length(min = 8, message = "must be at least 8 characters"))]
+    #[validate(length(min = 8))]
     pub new_password: String,
 }
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct ForcePasswordResetDto {
-    #[validate(length(min = 8, message = "must be at least 8 characters"))]
+    #[validate(length(min = 8))]
     pub temporary_password: String,
 }
 

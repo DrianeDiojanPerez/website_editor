@@ -30,7 +30,7 @@ impl From<Project> for ProjectDto {
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct NewProjectDto {
-    #[validate(length(min = 1, max = 200, message = "must be 1-200 characters"))]
+    #[validate(length(min = 1, max = 200))]
     pub name: String,
 
     #[serde(default)]
@@ -39,7 +39,7 @@ pub struct NewProjectDto {
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct UpdateProjectDto {
-    #[validate(length(min = 1, max = 200, message = "must be 1-200 characters"))]
+    #[validate(length(min = 1, max = 200))]
     pub name: Option<String>,
 
     pub object_data: Option<Value>,

@@ -5,9 +5,9 @@ use axum::Router;
 use tower_http::trace::TraceLayer;
 
 use super::handler::{
-    auth as auth_handler, health as health_handler, project as project_handler,
-    project_member as project_member_handler, project_version as project_version_handler,
-    user as user_handler, Handler,
+    auth as auth_handler, docs as docs_handler, health as health_handler,
+    project as project_handler, project_member as project_member_handler,
+    project_version as project_version_handler, user as user_handler, Handler,
 };
 use super::middlewares::jwt::{require_jwt, require_password_set};
 
@@ -91,6 +91,9 @@ pub fn router(handler: Arc<Handler>) -> Router {
         .merge(protected);
 
     Router::new()
+        // Scalar-rendered API docs at the root.
+        .route("/", get(docs_handler::scalar))
+        .route("/openapi.yaml", get(docs_handler::openapi_yaml))
         .route("/health", get(health_handler::get_health))
         .nest("/api/v1", v1)
         .with_state(handler)

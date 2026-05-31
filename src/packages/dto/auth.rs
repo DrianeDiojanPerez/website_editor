@@ -5,22 +5,22 @@ use crate::packages::dto::user::UserDto;
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct LoginDto {
-    #[validate(email(message = "must be a valid email address"))]
+    #[validate(email)]
     pub email: String,
 
-    #[validate(length(min = 1, message = "is required"))]
+    #[validate(length(min = 1))]
     pub password: String,
 }
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct RefreshDto {
-    #[validate(length(min = 1, message = "is required"))]
+    #[validate(length(min = 1))]
     pub refresh_token: String,
 }
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct LogoutDto {
-    #[validate(length(min = 1, message = "is required"))]
+    #[validate(length(min = 1))]
     pub refresh_token: String,
 }
 

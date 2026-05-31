@@ -1,0 +1,659 @@
+openapi: 3.0.3
+info:
+  title: website_editor
+  version: 0.0.0
+  description: |
+    Project-versioning API: users, projects, project members, project versions.
+
+    Auth is JWT (Ed25519) with rotating refresh tokens stored hashed in the
+    database. Send `Authorization: Bearer <access_token>` on every protected
+    route.
+
+servers:
+  - url: /
+    description: Local
+
+tags:
+  - name: Health
+  - name: Auth
+  - name: Users
+  - name: Projects
+  - name: ProjectMembers
+  - name: ProjectVersions
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Service identity
+      security: []
+      responses:
+        '200':
+          description: name and version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthDto'
+
+  /api/v1/auth/signup:
+    post:
+      tags: [Auth]
+      summary: Self-signup
+      description: Creates a user account and returns access + refresh tokens.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewUserDto'
+      responses:
+        '201': { $ref: '#/components/responses/AuthResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginDto'
+      responses:
+        '200': { $ref: '#/components/responses/AuthResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Rotate the refresh token
+      description: |
+        Exchanges a refresh token for a new access + refresh pair. The
+        presented refresh token is revoked even before the new pair is
+        issued — replay of the same refresh token returns 401.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshDto'
+      responses:
+        '200': { $ref: '#/components/responses/AuthResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke a refresh token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutDto'
+      responses:
+        '204':
+          description: revoked
+
+  /api/v1/auth/change-password:
+    post:
+      tags: [Auth]
+      summary: Change own password
+      description: |
+        Reachable while `must_change_password` is set. Verifies the current
+        password, hashes the new one, clears the flag, and revokes all of
+        the user's other refresh tokens.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordDto'
+      responses:
+        '200': { $ref: '#/components/responses/UserResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  /api/v1/users:
+    get:
+      tags: [Users]
+      summary: List users
+      responses:
+        '200':
+          description: list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response_UserList'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '428': { $ref: '#/components/responses/PasswordChangeRequired' }
+    post:
+      tags: [Users]
+      summary: Admin-create a user
+      description: |
+        Sets `must_change_password = true` so the user must change their
+        password on first use.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewUserDto'
+      responses:
+        '201': { $ref: '#/components/responses/UserResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '428': { $ref: '#/components/responses/PasswordChangeRequired' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  /api/v1/users/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Users]
+      summary: Get user
+      responses:
+        '200': { $ref: '#/components/responses/UserResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '428': { $ref: '#/components/responses/PasswordChangeRequired' }
+    patch:
+      tags: [Users]
+      summary: Update user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserDto'
+      responses:
+        '200': { $ref: '#/components/responses/UserResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Users]
+      summary: Delete user
+      responses:
+        '204':
+          description: deleted
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/users/{id}/reset-password:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Users]
+      summary: Admin force-reset
+      description: |
+        Sets the user's password to the supplied temporary one and flips
+        `must_change_password`. Revokes all of that user's refresh tokens.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForcePasswordResetDto'
+      responses:
+        '200': { $ref: '#/components/responses/UserResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/projects:
+    get:
+      tags: [Projects]
+      summary: List projects
+      responses:
+        '200':
+          description: list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response_ProjectList'
+    post:
+      tags: [Projects]
+      summary: Create project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewProjectDto'
+      responses:
+        '201': { $ref: '#/components/responses/ProjectResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  /api/v1/projects/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Projects]
+      summary: Get project
+      responses:
+        '200': { $ref: '#/components/responses/ProjectResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Projects]
+      summary: Update project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProjectDto'
+      responses:
+        '200': { $ref: '#/components/responses/ProjectResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Projects]
+      summary: Delete project
+      responses:
+        '204':
+          description: deleted
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/projects/{project_id}/members:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [ProjectMembers]
+      summary: List members of a project
+      responses:
+        '200':
+          description: list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response_ProjectMemberList'
+    post:
+      tags: [ProjectMembers]
+      summary: Attach a user to a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttachMemberDto'
+      responses:
+        '201': { $ref: '#/components/responses/ProjectMemberResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  /api/v1/projects/{project_id}/members/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [ProjectMembers]
+      summary: Change a member's role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMemberDto'
+      responses:
+        '200': { $ref: '#/components/responses/ProjectMemberResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [ProjectMembers]
+      summary: Detach a member
+      responses:
+        '204':
+          description: detached
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/projects/{project_id}/versions:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [ProjectVersions]
+      summary: List snapshots for a project
+      responses:
+        '200':
+          description: list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response_ProjectVersionList'
+    post:
+      tags: [ProjectVersions]
+      summary: Snapshot the project at the current state
+      description: |
+        Bumps the project's `current_version` and stores the supplied JSON
+        snapshot under that version number.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewProjectVersionDto'
+      responses:
+        '201': { $ref: '#/components/responses/ProjectVersionResponse' }
+
+  /api/v1/projects/{project_id}/versions/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [ProjectVersions]
+      summary: Get one snapshot
+      responses:
+        '200': { $ref: '#/components/responses/ProjectVersionResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT (EdDSA / Ed25519)
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
+    ProjectId:
+      name: project_id
+      in: path
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
+
+  responses:
+    Unauthorized:
+      description: missing / invalid / expired credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    NotFound:
+      description: resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    ValidationError:
+      description: |
+        The body failed DTO-level validation. The `fields` map contains one
+        entry per failing field with a list of human-readable messages.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorEnvelope'
+    PasswordChangeRequired:
+      description: |
+        Authenticated, but `must_change_password` is set. The only reachable
+        protected route is `POST /api/v1/auth/change-password`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+
+    AuthResponse:
+      description: user + new token pair
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Response_AuthResponseDto'
+    UserResponse:
+      description: a user
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Response_UserDto'
+    ProjectResponse:
+      description: a project
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Response_ProjectDto'
+    ProjectMemberResponse:
+      description: a project member
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Response_ProjectMemberDto'
+    ProjectVersionResponse:
+      description: a project version snapshot
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Response_ProjectVersionDto'
+
+  schemas:
+    HealthDto:
+      type: object
+      properties:
+        name: { type: string, example: website_editor }
+        version: { type: string, example: 0.0.0 }
+      required: [name, version]
+
+    UserDto:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        username: { type: string }
+        email: { type: string, format: email }
+        is_system: { type: boolean }
+        must_change_password: { type: boolean }
+        last_login_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+      required: [id, username, email, is_system, must_change_password, created_at, updated_at]
+
+    NewUserDto:
+      type: object
+      properties:
+        username: { type: string, minLength: 5 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+      required: [username, email, password]
+
+    UpdateUserDto:
+      type: object
+      properties:
+        username: { type: string, minLength: 5, nullable: true }
+        email: { type: string, format: email, nullable: true }
+        password: { type: string, minLength: 8, nullable: true }
+
+    ChangePasswordDto:
+      type: object
+      properties:
+        current_password: { type: string, minLength: 1 }
+        new_password: { type: string, minLength: 8 }
+      required: [current_password, new_password]
+
+    ForcePasswordResetDto:
+      type: object
+      properties:
+        temporary_password: { type: string, minLength: 8 }
+      required: [temporary_password]
+
+    LoginDto:
+      type: object
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 1 }
+      required: [email, password]
+
+    RefreshDto:
+      type: object
+      properties:
+        refresh_token: { type: string, minLength: 1 }
+      required: [refresh_token]
+
+    LogoutDto:
+      type: object
+      properties:
+        refresh_token: { type: string, minLength: 1 }
+      required: [refresh_token]
+
+    TokenPairDto:
+      type: object
+      properties:
+        access_token: { type: string, description: 'Short-lived JWT (EdDSA). Default lifetime 15 minutes.' }
+        refresh_token: { type: string, description: 'Opaque random 64-char hex. Default lifetime 30 days.' }
+        token_type: { type: string, example: Bearer }
+        expires_in: { type: integer, format: int64, description: 'access-token lifetime, seconds' }
+        refresh_expires_in: { type: integer, format: int64, description: 'refresh-token lifetime, seconds' }
+      required: [access_token, refresh_token, token_type, expires_in, refresh_expires_in]
+
+    AuthResponseDto:
+      type: object
+      properties:
+        user: { $ref: '#/components/schemas/UserDto' }
+        token: { $ref: '#/components/schemas/TokenPairDto' }
+      required: [user, token]
+
+    ProjectDto:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        current_version: { type: integer, format: int64 }
+        object_data: { description: 'Arbitrary JSON.' }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+      required: [id, name, current_version, object_data, created_at, updated_at]
+
+    NewProjectDto:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        object_data: { description: 'Arbitrary JSON. Defaults to {} when omitted.', nullable: true }
+      required: [name]
+
+    UpdateProjectDto:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200, nullable: true }
+        object_data: { nullable: true }
+
+    ProjectMemberDto:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        project_id: { type: integer, format: int64 }
+        user_id: { type: integer, format: int64 }
+        role: { type: string, enum: [editor, viewer] }
+      required: [id, project_id, user_id, role]
+
+    AttachMemberDto:
+      type: object
+      properties:
+        user_id: { type: integer, format: int64, minimum: 1 }
+        role: { type: string, enum: [editor, viewer], default: viewer }
+      required: [user_id]
+
+    UpdateMemberDto:
+      type: object
+      properties:
+        role: { type: string, enum: [editor, viewer] }
+      required: [role]
+
+    ProjectVersionDto:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        project_id: { type: integer, format: int64 }
+        version_number: { type: integer, format: int64 }
+        object_snapshot: { description: 'Arbitrary JSON snapshot.' }
+        created_by: { type: integer, format: int64, nullable: true }
+        created_at: { type: string, format: date-time }
+      required: [id, project_id, version_number, object_snapshot, created_at]
+
+    NewProjectVersionDto:
+      type: object
+      properties:
+        object_snapshot: { description: 'Arbitrary JSON snapshot.' }
+        created_by: { type: integer, format: int64, nullable: true }
+      required: [object_snapshot]
+
+    # ---- envelope ----
+
+    ErrorEnvelope:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: integer }
+            message: { type: string }
+          required: [code, message]
+      required: [error]
+
+    ValidationErrorEnvelope:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: integer, example: 2005 }
+            message: { type: string, example: 'validation failed' }
+            fields:
+              type: object
+              additionalProperties:
+                type: array
+                items: { type: string }
+              example:
+                username: ['Must be at least 5 characters']
+                email: ['Invalid email format']
+          required: [code, message]
+      required: [error]
+
+    # ---- response wrappers (Response<T>) ----
+
+    Response_UserDto:
+      type: object
+      properties:
+        data: { $ref: '#/components/schemas/UserDto' }
+    Response_UserList:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/UserDto' }
+    Response_AuthResponseDto:
+      type: object
+      properties:
+        data: { $ref: '#/components/schemas/AuthResponseDto' }
+    Response_ProjectDto:
+      type: object
+      properties:
+        data: { $ref: '#/components/schemas/ProjectDto' }
+    Response_ProjectList:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectDto' }
+    Response_ProjectMemberDto:
+      type: object
+      properties:
+        data: { $ref: '#/components/schemas/ProjectMemberDto' }
+    Response_ProjectMemberList:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectMemberDto' }
+    Response_ProjectVersionDto:
+      type: object
+      properties:
+        data: { $ref: '#/components/schemas/ProjectVersionDto' }
+    Response_ProjectVersionList:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectVersionDto' }

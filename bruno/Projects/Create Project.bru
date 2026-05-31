@@ -1,0 +1,24 @@
+meta {
+  name: Create Project
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/projects
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "My Site",
+    "object_data": {}
+  }
+}
+
+script:post-response {
+  if (res.getStatus() < 300 && res.getBody()?.data?.id) {
+    bru.setEnvVar("projectId", res.getBody().data.id);
+  }
+}
